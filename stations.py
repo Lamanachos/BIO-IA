@@ -1,21 +1,27 @@
-#station : id, x, y
+#distances en km temps en s
 import random as r
-from math import sqrt
+from math import sqrt,inf
 import matplotlib.pyplot as plt
 import copy as cp
 
-def getMatriceDist(stations):
-        mat = []
-        for i in range(len(stations)):
-            line = []
-            for j in range(len(stations)):
-                line.append(stations[i].distance(stations[j]))
-            mat.append(line)
-        return mat
+def distance(x1,y1,x2,y2):
+    return sqrt((x2-x1)**2+(y2-y1)**2)
+
+class Station:
+    def __init__(self, id, x, y):
+        self.id = id
+        self.x = x
+        self.y = y
+    def distanceStat(self, station):
+        return distance(self.x,self.y,station.x,station.y)
+    def distance(self, x1 : int,y1 : int):
+        return distance(self.x,self.y,x1,y1)
+    def print(self):
+        print("["+str(self.id)+","+str(self.x)+","+str(self.y)+"]")
 
 class Line:
     totalLines = 0
-    def __init__(self, stations, timeInterval):
+    def __init__(self, stations : list[Station], timeInterval):
         self.id = Line.totalLines
         Line.totalLines += 1       
         self.stations = stations
@@ -30,29 +36,38 @@ class Line:
     def addStation(self,station):
         self.stations.append(station)
 
-class Station:
-    def __init__(self, id, x, y):
-        self.id = id
-        self.x = x
-        self.y = y
-    def distance(self, station):
-        return(sqrt((self.x-station.x)**2+(self.y-station.y)**2))
-    def print(self):
-        print("["+str(self.id)+","+str(self.x)+","+str(self.y)+"]")
-
+def getMatriceDist(stations,lines : list[Line]):
+        mat = []
+        for i in range(len(stations)):
+            l = []
+            for j in range(len(stations)):
+                l.append([])
+            mat.append(l)
+        for line in lines:
+            stats = line.stations
+            l = len(stats)
+            for i in range(l-2):
+                if mat[stats[i].id][stats[i+1].id] != []:
+                    mat[stats[i].id][stats[i+1].id].append(line)
+                    mat[stats[i+1].id][stats[i].id].append(line)
+                else :
+                    mat[stats[i+1].id][stats[i].id].append(stats[i+1].distanceStat(stats[i]))
+                    mat[stats[i].id][stats[i+1].id].append(stats[i+1].distanceStat(stats[i]))
+                    mat[stats[i+1].id][stats[i].id].append(line)
+                    mat[stats[i].id][stats[i+1].id].append(line)
+        return mat
 
 class City:
-    def __init__(self, stations):
+    def __init__(self, stations : list[Station]):
         self.stations = stations
-        self.matriceDist = getMatriceDist(stations)
         self.lines = []
-    def __init__(self, stations, lines):
+        self.setMatriceDist()
+    def __init__(self, stations : list[Station], lines : list[Line]):
         self.stations = stations
-        self.matriceDist = getMatriceDist(stations)
+        self.matriceDist = getMatriceDist(stations,lines)
         self.lines = lines
     def addStation(self,station):
         self.stations.append(station)
-        self.setMatriceDist()
     def addLine(self,line : Line):
         for station in line.stations :
             if station not in self.stations :
@@ -64,7 +79,7 @@ class City:
             self.addLine(i)
         self.setMatriceDist()
     def setMatriceDist(self):
-        self.matriceDist = getMatriceDist(self.stations)
+        self.matriceDist = getMatriceDist(self.stations,self.lines)
     def print(self):
         for i in self.stations:
             i.print()
@@ -83,6 +98,37 @@ class City:
         plt.scatter(xs,ys)
         plt.legend()
         plt.show()
+    def Dijkstra(self,xstart,ystart,xend,yend,tstart,tstartSim):
+        tabDijkstra = []
+        for i in self.stations:
+            dist = i.distance(xstart,ystart)
+            tabDijkstra.append(dist*720)#en moyenne un humain met 720s à faire 1km
+        tabDijkstra.append(distance(xstart,ystart,xend,yend)*720)
+        minIndex = tabDijkstra.index(min(tabDijkstra))
+        previousMins = [minIndex]
+        tabDijkstras = [tabDijkstra.copy()]
+        while minIndex != len(tabDijkstra)-1 :
+            ts = tabDijkstra[minIndex]
+            matDists = self.matriceDist[minIndex]
+            for j in range(len(matDists)):
+                if matDists[j] != []:
+                    for line in matDists[j][1:]:
+                        temp = line.waitTime(self.stations[j],tstartSim,tabDijkstra[minIndex]+tstart)
+                        if tabDijkstra[j] > temp + ts + (matDists[j][0])*144:
+                            tabDijkstra[j] = temp + ts + (matDists[j][0])*144
+            distEnd = self.stations[j].distance(xend,yend)*720 + ts
+            if distEnd < tabDijkstra[-1]:
+                tabDijkstra[-1] = distEnd
+            tempmin = inf
+            tempminIndex = -1
+            for i in range(len(tabDijkstra)):
+                if (tabDijkstra[i]<tempmin) and (i not in previousMins):
+                    tempmin = tabDijkstra[i]
+                    tempminIndex = i
+            minIndex = tempminIndex
+            previousMins.append(minIndex)
+            tabDijkstras.append(tabDijkstra.copy())
+        return tabDijkstra[-1],tabDijkstras,distance(xstart,ystart,xend,yend)*720
 
 def generateStations(nb_stations,minx,maxx,miny,maxy):
     stations = []
@@ -97,11 +143,14 @@ def generateLines(stations,nbLines,minLenLines,maxLenLines,timeInterval):
     for i in range(nbLines):
         line = Line([],timeInterval) 
         j = r.randint(minLenLines,maxLenLines)
+        tempStats = stations.copy()
         for k in range(j):
-            stat = stations[r.randint(0,nbStations-1)]
+            stat = tempStats[r.randint(0,len(tempStats)-1)]
             if stat in stationsLeft :
                 stationsLeft.remove(stat)
             line.addStation(stat)
+            tempStats = stations.copy()
+            tempStats.remove(stat)
         lines.append(line)
     for i in stationsLeft:
         j = r.randint(0,nbLines-1)
@@ -114,4 +163,7 @@ def generateCity(nb_stations,minx,maxx,miny,maxy,nbLines,minLenLines,maxLenLines
     return City(stations,lines)
 
 paris = generateCity(100,0,10,0,10,10,5,15,3)
-paris.plot()
+dij = paris.Dijkstra(0,0,10,10,0,0)
+print(dij[0])
+#print(dij[1][-1])
+print(dij[2])
