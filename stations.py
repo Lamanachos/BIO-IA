@@ -1,6 +1,6 @@
 #distances en km temps en s
 import random as r
-from math import sqrt,inf
+from math import sqrt,inf,floor
 import matplotlib.pyplot as plt
 import copy as cp
 import time as t
@@ -166,7 +166,7 @@ class City:
             plt.plot(lx,ly,label = line.id)
         plt.scatter(xs,ys)
         plt.legend()
-        plt.show()
+        #plt.show()
     def Dijkstra(self,xstart,ystart,xend,yend,tstart,tstartSim):
         tabDijkstra = []
         tabLine = []
@@ -250,6 +250,31 @@ class City:
             nbTot += 1
         return tot/nbTot
 
+def mutateLines(listLines : list[Line],stations,nbMutations):
+    lines = []
+    for line in listLines :
+        lines.append(Line(line.stations.copy(),line.timeInterval, line.id))
+    for i in range(nbMutations):
+        line = r.choice(lines)
+        add = r.choice([True,False])
+        if not add :
+            if len(line.stations) > 2 :
+                line.stations.pop(r.randint(0,len(line.stations)-1))
+        else :
+            tempStats = stations.copy()
+            for stat in line.stations :
+                tempStats.remove(stat)
+            if tempStats != [] :
+                line.addStation(r.choice(tempStats))
+    #make sure all stations still deserved
+    stationsLeft = stations.copy()
+    for line in lines:
+        for stat in line.stations:
+            if stat in stationsLeft :
+                stationsLeft.remove(stat)
+    for stat in stationsLeft :
+        r.choice(lines).addStation(stat)
+    return lines
 
 def generateStations(nb_stations,minx,maxx,miny,maxy):
     stations = []
@@ -270,39 +295,44 @@ def generateLines(stations,nbLines,minLenLines,maxLenLines,timeInterval):
             if stat in stationsLeft :
                 stationsLeft.remove(stat)
             line.addStation(stat)
-            tempStats = stations.copy()
-            tempStats.remove(stat)
+            tempStats.remove(stat) #pas deux fois la même stations dans une ligne
         lines.append(line)
     for i in stationsLeft:
         j = r.randint(0,nbLines-1)
         lines[j].addStation(i)
     return lines
 
-def generateCity(nb_stations,minx,maxx,miny,maxy,nbLines,minLenLines,maxLenLines,timeInterval):
+def generateCity(nb_stations,minx,maxx,miny,maxy,nbLines,minLenLines,maxLenLines,timeInterval,name):
     stations = generateStations(nb_stations,minx,maxx,miny,maxy)
     lines = generateLines(stations,nbLines,minLenLines,maxLenLines,timeInterval)
-    return City(stations,lines)
+    return City(stations,lines,name)
+
+def evolutionStep(city : City,listLines : list[Line],size):
+    results = []
+    for i in range(len(listLines)) :
+        city.setLines(listLines[i])
+        results.append(city.test(10000,10002,100))
+        print(i+1,"/",len(listLines))
+    sortListLines = listLines.copy()
+    sortListLines.sort(key = lambda j : results[listLines.index(j)],reverse=True)
+    results.sort(reverse=True)
+    print(len(listLines))
+    return listLines[:size],results[0]
 
 
-""" stations = [Station(0,0,0),Station(2,0,1),Station(1,0,2)]
-lines = [Line(stations,180)]
-city = City(stations,lines) """
-""" start = t.time()
-city = generateCity(300,0,10,0,10,16,15,25,180)
-print(t.time()-start)
-start = t.time()
-#dij = city.Dijkstra(0,0,10,10,0,10000)
-#print(dij[4])
-test = city.test(10000,10002,100)
-print(test)
-city.setLines(generateLines(city.stations,16,15,25,180))
-test = city.test(10000,10002,100)
-print(test)
-print(t.time()-start) """
-stations = [Station(0,0,0),Station(2,1,1),Station(1,0,2)]
+""" stations = [Station(0,0,0),Station(2,1,1),Station(1,0,2)]
 lines = [Line(stations,180)]
 city = City(stations,lines,"Paris")
 city.save()
 city2 = City.fromFile("Paris")
 city2.setName("Milan")
-city2.save()
+city2.save() """
+
+city = generateCity(20,0,10,0,10,3,0,5,180,"Paris")
+city.save()
+city2 = City(city.stations,mutateLines(city.lines,city.stations,5),"Re")
+plt.subplot(1,2,1)
+city.plot()
+plt.subplot(1,2,2)
+city2.plot()
+plt.show()
