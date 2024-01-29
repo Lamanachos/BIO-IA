@@ -42,12 +42,10 @@ class Line:
     @classmethod
     def fromJson(cls,fj : [list[int],int,int],allStations : list[Station]):
         stations = []
-        print(fj)
         for i in fj[0]:
             ind = 0
             for j in range(len(allStations)):
                 if allStations[j].id == i:
-                    print("hi")
                     ind = j
             stations.append(allStations[ind])
         return cls(stations,fj[1],fj[2])
@@ -94,21 +92,32 @@ def getMatriceDist(stations,lines : list[Line]):
         return mat
 
 class City:
-    def __init__(self, stations : list[Station], lines : list[Line]):
+    def __init__(self, stations : list[Station], lines : list[Line],name : str):
         self.stations = stations
         self.matriceDist = getMatriceDist(stations,lines)
         self.lines = lines
+        self.name = name
 
     @classmethod
-    def fromJson(cls,fjStations,fjLines):
+    def fromJson(cls,fjStations,fjLines,name):
         stations = []
         lines = []
         for i in fjStations:
             stations.append(Station.fromJson(i))
         for i in fjLines:
             lines.append(Line.fromJson(i,stations))
-        return cls(stations,lines)
+        return cls(stations,lines,name)
 
+    @classmethod
+    def fromFile(cls,name):
+        with open(f"./cities/{name}_stations.json", "r") as city_file:
+            stations = json.load(city_file)
+        with open(f"./cities/{name}_lines.json", "r") as city_file:
+            lines = json.load(city_file)
+        return cls.fromJson(stations,lines,name)
+
+    def setName(self,name):
+        self.name = name
     def toJson(self):
         jLines = []
         jStations = []
@@ -117,6 +126,12 @@ class City:
         for i in self.lines:
             jLines.append(i.toJson())
         return jStations,jLines
+    def save(self):
+        jstats,jlines = self.toJson()
+        with open(f"./cities/{self.name}_stations.json", "w") as city_file:
+            json.dump(jstats, city_file, indent=4)
+        with open(f"./cities/{self.name}_lines.json", "w") as city_file:
+            json.dump(jlines, city_file, indent=4)
     def addStation(self,station):
         self.stations.append(station)
     def addLine(self,line : Line):
@@ -286,20 +301,8 @@ print(test)
 print(t.time()-start) """
 stations = [Station(0,0,0),Station(2,1,1),Station(1,0,2)]
 lines = [Line(stations,180)]
-city = City(stations,lines)
-#city.plot()
-jstats,jlines = city.toJson()
-with open("./cities/city1_stations.json", "w") as city_file:
-    json.dump(jstats, city_file, indent=4)
-
-with open("./cities/city1_lines.json", "w") as city_file:
-    json.dump(jlines, city_file, indent=4)
-
-with open("./cities/city1_stations.json", "r") as city_file:
-    stations = json.load(city_file)
-
-with open("./cities/city1_lines.json", "r") as city_file:
-    lines = json.load(city_file)
-
-city = City.fromJson(stations,lines)
-city.plot()
+city = City(stations,lines,"Paris")
+city.save()
+city2 = City.fromFile("Paris")
+city2.setName("Milan")
+city2.save()
