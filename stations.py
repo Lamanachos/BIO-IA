@@ -210,7 +210,8 @@ class City:
             tabLines.append(tabLine.copy())
         #get the clean way
         stops = []
-        point = tabDijkstras[-1][-1]
+        steps = []
+        """ point = tabDijkstras[-1][-1]
         pointIndex = -1
         l = len(tabDijkstras)
         for i in range(1,l+1):
@@ -224,7 +225,6 @@ class City:
                 stops.insert(0,[point,pointIndex])
         stops.insert(0,[0,"Start"])
         stops.append([tabDijkstra[-1],"End"])
-        steps = []
         for i in range(0,len(stops)-1):
             timestep = stops[i+1][0]-stops[i][0]
             if (i != 0) and (i != len(stops)-2):
@@ -235,7 +235,7 @@ class City:
             if nextStat != "End":
                 steps.append([str(stops[i][1])+" to "+str(stops[i+1][1]) + " with " + str(tabLines[-1][stops[i+1][1]]),timestep])
             else :
-                steps.append([str(stops[i][1])+" to "+str(stops[i+1][1]) + " with Walk",timestep])
+                steps.append([str(stops[i][1])+" to "+str(stops[i+1][1]) + " with Walk",timestep]) """
         return tabDijkstra[-1],steps
     def test(self,tstart,tend,nbTrips):
         tot = 0
@@ -249,6 +249,19 @@ class City:
             tot += dij[0]
             nbTot += 1
         return tot/nbTot
+    def testFixed(self,startEnds,tstart,tend):
+        tot = 0
+        nbTot = 0
+        for i in startEnds:
+            xstart = i[0]
+            ystart = i[1]
+            xend = i[2]
+            yend = i[3]
+            dij = self.Dijkstra(xstart,ystart,xend,yend,tstart+(tend-tstart)*nbTot/len(startEnds),0)
+            tot += dij[0]
+            nbTot += 1
+        return tot/nbTot
+
 
 def mutateLines(listLines : list[Line],stations,nbMutations):
     lines = []
@@ -307,19 +320,41 @@ def generateCity(nb_stations,minx,maxx,miny,maxy,nbLines,minLenLines,maxLenLines
     lines = generateLines(stations,nbLines,minLenLines,maxLenLines,timeInterval)
     return City(stations,lines,name)
 
-def evolutionStep(city : City,listLines : list[Line],size):
+def evolutionStep(city : City,listLines : list[list[Line]],size,nbTests=None):
     results = []
+    nbDoable = nbTests
+    if nbDoable == None :
+        nbDoable = len(city.stations)*(len(city.stations)-1)
+        fixedTests = []
+        for i in city.stations:
+            for j in city.stations:
+                if i != j:
+                    fixedTests.append([i.x,i.y,j.x,j.y])
     for i in range(len(listLines)) :
         city.setLines(listLines[i])
-        results.append(city.test(10000,10002,100))
-        print(i+1,"/",len(listLines))
+        if nbTests == None :#on fait tout les tests possibles (par stations)
+            results.append(city.testFixed(fixedTests,10000,10000+floor(nbDoable/15)))
+        else :
+            results.append(city.test(10000,10000+floor(nbTests/15),nbTests))
+        #print(i+1,"/",len(listLines))
     sortListLines = listLines.copy()
-    sortListLines.sort(key = lambda j : results[listLines.index(j)],reverse=True)
-    results.sort(reverse=True)
-    print(len(listLines))
-    return listLines[:size],results[0]
+    sortListLines.sort(key = lambda j : results[listLines.index(j)])
+    results.sort()
+    return sortListLines[:size],results[:size]
 
-
+def evolutionProcess(city,pop,nbGenerations,nbMutations,nbKeep,nbTests=None):
+    allResults = []
+    for i in range(nbGenerations):
+        bests,results = evolutionStep(city,pop,nbKeep,nbTests)
+        print("Gen ",i," done")
+        print("Best averages : ",results)
+        allResults.append(results[0])
+        newPop = []
+        for lines in bests :
+            for j in range(int(len(pop)/len(bests))):
+                newPop.append(mutateLines(lines,city.stations,nbMutations))
+        pop = newPop
+    return City(city.stations,evolutionStep(city,pop,nbKeep,nbTests)[0][0],city.name+"_best"),allResults
 """ stations = [Station(0,0,0),Station(2,1,1),Station(1,0,2)]
 lines = [Line(stations,180)]
 city = City(stations,lines,"Paris")
@@ -328,11 +363,16 @@ city2 = City.fromFile("Paris")
 city2.setName("Milan")
 city2.save() """
 
-city = generateCity(20,0,10,0,10,3,0,5,180,"Paris")
+city = generateCity(20,0,10,0,10,3,0,5,180,"Nancy")
 city.save()
-city2 = City(city.stations,mutateLines(city.lines,city.stations,5),"Re")
-plt.subplot(1,2,1)
-city.plot()
-plt.subplot(1,2,2)
-city2.plot()
-plt.show()
+
+city = City.fromFile("Nancy")
+pop = []
+for i in range(100):
+    pop.append(generateLines(city.stations,3,2,20,180))
+best_city, allres = evolutionProcess(city,pop,100,5,10)
+best_city.save()
+with open(f"./cities/{best_city.name}_allres.json", "w") as city_file:
+    json.dump(allres, city_file, indent=4)
+
+#save the parameters for nancy
