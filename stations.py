@@ -4,6 +4,7 @@ from math import sqrt,inf
 import matplotlib.pyplot as plt
 import copy as cp
 import time as t
+import json
 
 def distance(x1,y1,x2,y2):
     return sqrt((x2-x1)**2+(y2-y1)**2)
@@ -13,20 +14,49 @@ class Station:
         self.id = id
         self.x = x
         self.y = y
+    
+    @classmethod
+    def fromJson(cls,fj : list[int]):
+        return cls(fj[0],fj[1],fj[2])
+    
+    def toJson(self):
+        return [self.id,self.x,self.y]
     def distanceStat(self, station):
         return distance(self.x,self.y,station.x,station.y)
     def distance(self, x1 : int,y1 : int):
         return distance(self.x,self.y,x1,y1)
     def print(self):
         print("["+str(self.id)+","+str(self.x)+","+str(self.y)+"]")
-
+    
 class Line:
     totalLines = 0
-    def __init__(self, stations : list[Station], timeInterval):
-        self.id = Line.totalLines
-        Line.totalLines += 1       
+    def __init__(self, stations : list[Station], timeInterval,id=None):
+        if id == None :
+            self.id = Line.totalLines
+            Line.totalLines += 1
+        else :
+            self.id = id
         self.stations = stations
         self.timeInterval = timeInterval
+    
+    @classmethod
+    def fromJson(cls,fj : [list[int],int,int],allStations : list[Station]):
+        stations = []
+        print(fj)
+        for i in fj[0]:
+            ind = 0
+            for j in range(len(allStations)):
+                if allStations[j].id == i:
+                    print("hi")
+                    ind = j
+            stations.append(allStations[ind])
+        return cls(stations,fj[1],fj[2])
+    
+    def toJson(self):
+        statsIds = []
+        for i in self.stations:
+            statsIds.append(i.id)
+        return [statsIds,self.timeInterval,self.id]
     def waitTime(self,station,timeStart,actualTime):
         if station in self.stations :
             position = self.stations.index(station)
@@ -64,14 +94,29 @@ def getMatriceDist(stations,lines : list[Line]):
         return mat
 
 class City:
-    def __init__(self, stations : list[Station]):
-        self.stations = stations
-        self.lines = []
-        self.setMatriceDist()
     def __init__(self, stations : list[Station], lines : list[Line]):
         self.stations = stations
         self.matriceDist = getMatriceDist(stations,lines)
         self.lines = lines
+
+    @classmethod
+    def fromJson(cls,fjStations,fjLines):
+        stations = []
+        lines = []
+        for i in fjStations:
+            stations.append(Station.fromJson(i))
+        for i in fjLines:
+            lines.append(Line.fromJson(i,stations))
+        return cls(stations,lines)
+
+    def toJson(self):
+        jLines = []
+        jStations = []
+        for i in self.stations:
+            jStations.append(i.toJson())
+        for i in self.lines:
+            jLines.append(i.toJson())
+        return jStations,jLines
     def addStation(self,station):
         self.stations.append(station)
     def addLine(self,line : Line):
@@ -83,6 +128,9 @@ class City:
     def addLines(self, lines : list[Line]):
         for i in lines :
             self.addLine(i)
+        self.setMatriceDist()
+    def setLines(self, lines):
+        self.lines = lines
         self.setMatriceDist()
     def setMatriceDist(self):
         self.matriceDist = getMatriceDist(self.stations,self.lines)
@@ -106,13 +154,17 @@ class City:
         plt.show()
     def Dijkstra(self,xstart,ystart,xend,yend,tstart,tstartSim):
         tabDijkstra = []
+        tabLine = []
         for i in self.stations:
             dist = i.distance(xstart,ystart)
             tabDijkstra.append(dist*720)#en moyenne un humain met 720s à faire 1km
+            tabLine.append("Walk")
         tabDijkstra.append(distance(xstart,ystart,xend,yend)*720)
+        tabLine.append("Walk")
         minIndex = tabDijkstra.index(min(tabDijkstra))
         previousMins = [minIndex]
         tabDijkstras = [tabDijkstra.copy()]
+        tabLines = [tabLine.copy()]
         while minIndex != len(tabDijkstra)-1 :
             ts = tabDijkstra[minIndex]
             #print("tab : ",tabDijkstra)
@@ -127,6 +179,7 @@ class City:
                         temp = line.waitTime(self.stations[j],tstartSim,tabDijkstra[minIndex]+tstart)
                         if tabDijkstra[j] > temp + ts + (matDists[j][0])*144:
                             tabDijkstra[j] = temp + ts + (matDists[j][0])*144
+                            tabLine[j] = line.id
             distEnd = self.stations[minIndex].distance(xend,yend)*720 + ts
             if distEnd < tabDijkstra[-1]:
                 tabDijkstra[-1] = distEnd
@@ -139,6 +192,7 @@ class City:
             minIndex = tempminIndex
             previousMins.append(minIndex)
             tabDijkstras.append(tabDijkstra.copy())
+            tabLines.append(tabLine.copy())
         #get the clean way
         stops = []
         point = tabDijkstras[-1][-1]
@@ -162,8 +216,25 @@ class City:
                 wait = timestep - self.matriceDist[stops[i+1][1]][stops[i][1]][0]*144
                 steps.append(["Wait",wait])
                 timestep = timestep - wait
-            steps.append([str(stops[i][1])+" to "+str(stops[i+1][1]),timestep])
-        return tabDijkstra[-1],tabDijkstras,distance(xstart,ystart,xend,yend)*720,stops,steps
+            nextStat = stops[i+1][1]
+            if nextStat != "End":
+                steps.append([str(stops[i][1])+" to "+str(stops[i+1][1]) + " with " + str(tabLines[-1][stops[i+1][1]]),timestep])
+            else :
+                steps.append([str(stops[i][1])+" to "+str(stops[i+1][1]) + " with Walk",timestep])
+        return tabDijkstra[-1],steps
+    def test(self,tstart,tend,nbTrips):
+        tot = 0
+        nbTot = 0
+        for i in range(nbTrips):
+            xstart = r.random()*10
+            ystart = r.random()*10
+            xend = r.random()*10
+            yend = r.random()*10
+            dij = self.Dijkstra(xstart,ystart,xend,yend,tstart+(tend-tstart)*i/nbTrips,0)
+            tot += dij[0]
+            nbTot += 1
+        return tot/nbTot
+
 
 def generateStations(nb_stations,minx,maxx,miny,maxy):
     stations = []
@@ -198,20 +269,37 @@ def generateCity(nb_stations,minx,maxx,miny,maxy,nbLines,minLenLines,maxLenLines
     return City(stations,lines)
 
 
-# paris = generateCity(100,0,10,0,10,10,5,15,180)
-# dij = paris.Dijkstra(0,0,10,10,0,0)
-# print(dij[0])
-# for i in dij[1]:
-#     print(i)
-# print(dij[3])
-
 """ stations = [Station(0,0,0),Station(2,0,1),Station(1,0,2)]
 lines = [Line(stations,180)]
 city = City(stations,lines) """
-start = t.time()
-city = generateCity(300,0,10,0,10,16,5,15,180)
+""" start = t.time()
+city = generateCity(300,0,10,0,10,16,15,25,180)
 print(t.time()-start)
 start = t.time()
-dij = city.Dijkstra(0,0,10,10,0,500)
-print(t.time()-start)
+#dij = city.Dijkstra(0,0,10,10,0,10000)
+#print(dij[4])
+test = city.test(10000,10002,100)
+print(test)
+city.setLines(generateLines(city.stations,16,15,25,180))
+test = city.test(10000,10002,100)
+print(test)
+print(t.time()-start) """
+stations = [Station(0,0,0),Station(2,1,1),Station(1,0,2)]
+lines = [Line(stations,180)]
+city = City(stations,lines)
+#city.plot()
+jstats,jlines = city.toJson()
+with open("./cities/city1_stations.json", "w") as city_file:
+    json.dump(jstats, city_file, indent=4)
 
+with open("./cities/city1_lines.json", "w") as city_file:
+    json.dump(jlines, city_file, indent=4)
+
+with open("./cities/city1_stations.json", "r") as city_file:
+    stations = json.load(city_file)
+
+with open("./cities/city1_lines.json", "r") as city_file:
+    lines = json.load(city_file)
+
+city = City.fromJson(stations,lines)
+city.plot()
