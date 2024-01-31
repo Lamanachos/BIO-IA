@@ -374,7 +374,7 @@ def evolutionStep(city : City,listLines : list[list[Line]],size,nbTests=None,nbA
         paretosLines = []
         paretosRes = []
         paretosLens = []
-        for i in range(min(len(paretosIndexs),size)):
+        for i in range(min(len(paretosIndexs),len(listLines))):
             ind = paretosIndexs[i]
             paretosLines.append(listLines[ind])
             paretosRes.append(results[ind])
@@ -394,6 +394,7 @@ def evolutionProcess(city,pop,nbGenerations,nbMutations,nbKeep,nbTests=None,nbAr
         if nbArg == 2 :
             bests,results,lens = evolutionStep(city,pop,nbKeep,nbTests,nbArg)
             print("Gen ",i," done")
+            print("Nb paretos = ",len(bests))
             print("Pareto averages : ",results)
             print("Pareto lens :",lens)
             allResults.append(results)
@@ -443,3 +444,4 @@ with open(f"./cities/Nantes_best_alllen.json", "w") as city_file:
     json.dump(alllen, city_file, indent=4)
 
 #save the parameters for nancy
+#TODO : make a big list of all paretos, after each step, check if they are still paretos
