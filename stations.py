@@ -410,6 +410,46 @@ def evolutionProcess(city,pop,nbGenerations,nbMutations,nbKeep,nbTests=None,nbAr
     if nbArg == 2:
         return bests,allResults,allLens
 
+def evolutionProcess2(city,pop,nbGenerations,nbMutations,nbKeep,nbTests=None):
+    allResults = []
+    allLens = []
+    currentParetoRes = []
+    currentParetoLens = []
+    currentParetos = []
+    for i in range(nbGenerations):
+        bests,results,lens = evolutionStep(city,pop,nbKeep,nbTests,2)
+        print("Gen ",i," done")
+        print("Nb paretos = ",len(bests))
+        print("Pareto averages : ",results)
+        print("Pareto lens :",lens)
+        allResults.append(results)
+        allLens.append(lens)
+        for res in results :
+            currentParetoRes.append(res)
+        for length in lens :
+            currentParetoLens.append(length)
+        for pareto in bests :
+            currentParetos.append(pareto)
+        paretosIndexs = getParetos(currentParetoRes,currentParetoLens)
+        tempParetos = []
+        tempParetoLens = []
+        tempParetoRes = []
+        for ind in paretosIndexs:
+            tempParetoLens.append(currentParetoLens[ind])
+            tempParetoRes.append(currentParetoRes[ind])
+            tempParetos.append(currentParetos[ind])
+        currentParetos = tempParetos
+        currentParetoRes = tempParetoRes
+        currentParetoLens = tempParetoLens
+        newPop = []
+        tot = 0
+        while tot < len(pop):
+            newPop.append(mutateLines(bests[tot%len(bests)],city.stations,nbMutations))
+            tot+=1
+        pop = newPop
+    return bests,allResults,allLens,currentParetos,currentParetoRes,currentParetoLens
+
+
 def saveListLines(listLines : list[list[Line]],name):
     saveable = []
     for i in listLines:
@@ -429,19 +469,26 @@ city2 = City.fromFile("Paris")
 city2.setName("Milan")
 city2.save() """
 
-""" city = generateCity(20,0,10,0,10,3,0,5,180,"Nantes")
+city = generateCity(20,0,10,0,10,3,0,5,180,"Rennes")
 city.save()
- """
-city = City.fromFile("Nantes")
+
+city = City.fromFile("Rennes")
 pop = []
 for i in range(100):
     pop.append(generateLines(city.stations,3,2,20,180))
-bests, allres,alllen = evolutionProcess(city,pop,100,5,10,None,2)
-saveListLines(bests,"Nantes_best")
-with open(f"./cities/Nantes_best_allres.json", "w") as city_file:
+bests, allres,alllen,paretos,parres,parlens = evolutionProcess2(city,pop,100,5,10,None)
+saveListLines(bests,"Rennes_best")
+saveListLines(paretos,"par_Rennes_best")
+with open(f"./cities/Rennes_best_allres.json", "w") as city_file:
     json.dump(allres, city_file, indent=4)
-with open(f"./cities/Nantes_best_alllen.json", "w") as city_file:
+with open(f"./cities/Rennes_best_alllen.json", "w") as city_file:
     json.dump(alllen, city_file, indent=4)
+with open(f"./cities/Rennes_best_alllen.json", "w") as city_file:
+    json.dump(alllen, city_file, indent=4)
+with open(f"./cities/Rennes_best_parres.json", "w") as city_file:
+    json.dump(parres, city_file, indent=4)
+with open(f"./cities/Rennes_best_parlen.json", "w") as city_file:
+    json.dump(parlens, city_file, indent=4)
 
 #save the parameters for nancy
 #TODO : make a big list of all paretos, after each step, check if they are still paretos
