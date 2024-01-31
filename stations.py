@@ -201,6 +201,11 @@ class City:
                         if tabDijkstra[j] > temp + ts + (matDists[j][0])*144:
                             tabDijkstra[j] = temp + ts + (matDists[j][0])*144
                             tabLine[j] = line.id
+            for i in range(len(tabDijkstra)-1):
+                if i not in previousMins:
+                    distWalk = ts + self.stations[minIndex].distanceStat(self.stations[i])
+                    if distEnd < tabDijkstra[i]:
+                        tabDijkstra[i] = distEnd
             distEnd = self.stations[minIndex].distance(xend,yend)*720 + ts
             if distEnd < tabDijkstra[-1]:
                 tabDijkstra[-1] = distEnd
@@ -449,7 +454,6 @@ def evolutionProcess2(city,pop,nbGenerations,nbMutations,nbKeep,nbTests=None):
         pop = newPop
     return bests,allResults,allLens,currentParetos,currentParetoRes,currentParetoLens
 
-
 def saveListLines(listLines : list[list[Line]],name):
     saveable = []
     for i in listLines:
@@ -460,7 +464,17 @@ def saveListLines(listLines : list[list[Line]],name):
     with open(f"./cities/{name}_paretos.json", "w") as city_file:
             json.dump(saveable, city_file, indent=4)
     
-    
+def saveResEvoTwo(bests,allres,alllen,paretos,parres,parlens,name):
+    saveListLines(bests,f"{name}_best")
+    saveListLines(paretos,f"par_{name}_best")
+    with open(f"./cities/{name}_best_allres.json", "w") as city_file:
+        json.dump(allres, city_file, indent=4)
+    with open(f"./cities/{name}_best_alllen.json", "w") as city_file:
+        json.dump(alllen, city_file, indent=4)
+    with open(f"./cities/{name}_best_parres.json", "w") as city_file:
+        json.dump(parres, city_file, indent=4)
+    with open(f"./cities/{name}_best_parlen.json", "w") as city_file:
+        json.dump(parlens, city_file, indent=4)
 """ stations = [Station(0,0,0),Station(2,1,1),Station(1,0,2)]
 lines = [Line(stations,180)]
 city = City(stations,lines,"Paris")
@@ -469,26 +483,15 @@ city2 = City.fromFile("Paris")
 city2.setName("Milan")
 city2.save() """
 
-city = generateCity(20,0,10,0,10,3,0,5,180,"Rennes")
+city = generateCity(20,0,10,0,10,3,0,5,180,"{name}")
 city.save()
 
-city = City.fromFile("Rennes")
+city = City.fromFile("{name}")
 pop = []
 for i in range(100):
     pop.append(generateLines(city.stations,3,2,20,180))
-bests, allres,alllen,paretos,parres,parlens = evolutionProcess2(city,pop,100,5,10,None)
-saveListLines(bests,"Rennes_best")
-saveListLines(paretos,"par_Rennes_best")
-with open(f"./cities/Rennes_best_allres.json", "w") as city_file:
-    json.dump(allres, city_file, indent=4)
-with open(f"./cities/Rennes_best_alllen.json", "w") as city_file:
-    json.dump(alllen, city_file, indent=4)
-with open(f"./cities/Rennes_best_alllen.json", "w") as city_file:
-    json.dump(alllen, city_file, indent=4)
-with open(f"./cities/Rennes_best_parres.json", "w") as city_file:
-    json.dump(parres, city_file, indent=4)
-with open(f"./cities/Rennes_best_parlen.json", "w") as city_file:
-    json.dump(parlens, city_file, indent=4)
+saveResEvoTwo(evolutionProcess2(city,pop,100,5,10,None))
+
 
 #save the parameters for nancy
 #TODO : make a big list of all paretos, after each step, check if they are still paretos
