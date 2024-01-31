@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import copy as cp
 import time as t
 import json
+from numpy import std
 
 def distance(x1,y1,x2,y2):
     return sqrt((x2-x1)**2+(y2-y1)**2)
@@ -67,6 +68,11 @@ class Line:
                 return firstStop - actualTime
     def addStation(self,station):
         self.stations.append(station)
+    def lenTunnels(self):
+        tot = 0
+        for i in range(len(self.stations)-2):
+            tot += self.stations[i].distanceStat(self.stations[i+1])
+        return tot
 
 def getMatriceDist(stations,lines : list[Line]):
         mat = []
@@ -289,6 +295,12 @@ def mutateLines(listLines : list[Line],stations,nbMutations):
         r.choice(lines).addStation(stat)
     return lines
 
+def getLenTunnels(lines : list[Line]):
+    tot = 0
+    for i in lines :
+        tot += i.lenTunnels()
+    return tot
+
 def generateStations(nb_stations,minx,maxx,miny,maxy):
     stations = []
     for i in range(nb_stations):
@@ -320,7 +332,17 @@ def generateCity(nb_stations,minx,maxx,miny,maxy,nbLines,minLenLines,maxLenLines
     lines = generateLines(stations,nbLines,minLenLines,maxLenLines,timeInterval)
     return City(stations,lines,name)
 
-def evolutionStep(city : City,listLines : list[list[Line]],size,nbTests=None):
+def getParetos(listA,listB):
+    paretos = []
+    for i in range(len(listA)):
+        pareto = True
+        for j in range(len(listA)):
+            if (listA[j] > listA[i]) and (listB[j] > listB[i]):
+                pareto = False
+        if pareto :
+            paretos.append(i)
+
+def evolutionStep(city : City,listLines : list[list[Line]],size,nbTests=None,nbArg = 1):
     results = []
     nbDoable = nbTests
     if nbDoable == None :
@@ -337,10 +359,26 @@ def evolutionStep(city : City,listLines : list[list[Line]],size,nbTests=None):
         else :
             results.append(city.test(10000,10000+floor(nbTests/15),nbTests))
         #print(i+1,"/",len(listLines))
-    sortListLines = listLines.copy()
-    sortListLines.sort(key = lambda j : results[listLines.index(j)])
-    results.sort()
-    return sortListLines[:size],results[:size]
+    if nbArg == 1 :
+        sortListLines = listLines.copy()
+        sortListLines.sort(key = lambda j : results[listLines.index(j)])
+        results.sort()
+        return sortListLines[:size],results[:size]
+    if nbArg == 2 :
+        lenTunnels = []
+        for i in range(len(listLines)) :
+            lenTunnels.append(getLenTunnels(listLines[i]))
+        paretosIndexs = getParetos(results,lenTunnels)
+        paretosIndexs.sort(key = lambda i : results[i])
+        paretosLines = []
+        paretosRes = []
+        paretosLens = []
+        for i in range(min(len(paretosIndexs,size))):
+            ind = paretosIndexs[i]
+            paretosLines.append(listLines[ind])
+            paretosRes.append(results[ind])
+            paretosLens.append(lenTunnels[ind])
+        return paretosLines,paretosRes,paretosLens
 
 def evolutionProcess(city,pop,nbGenerations,nbMutations,nbKeep,nbTests=None):
     allResults = []
@@ -348,8 +386,12 @@ def evolutionProcess(city,pop,nbGenerations,nbMutations,nbKeep,nbTests=None):
         bests,results = evolutionStep(city,pop,nbKeep,nbTests)
         print("Gen ",i," done")
         print("Best averages : ",results)
-        allResults.append(results[0])
+        allResults.append([results[0],sum(results)/len(results),results[floor(len(results)/2)]])
         newPop = []
+        tot = 0
+        """ while tot < len(pop):
+            newPop.append(mutateLines(bests(tot%len(bests)),city.stations,nbMutations))
+            tot+=1 """
         for lines in bests :
             for j in range(int(len(pop)/len(bests))):
                 newPop.append(mutateLines(lines,city.stations,nbMutations))
@@ -363,10 +405,10 @@ city2 = City.fromFile("Paris")
 city2.setName("Milan")
 city2.save() """
 
-city = generateCity(20,0,10,0,10,3,0,5,180,"Nancy")
+""" city = generateCity(20,0,10,0,10,3,0,5,180,"Nantes")
 city.save()
-
-city = City.fromFile("Nancy")
+ """
+city = City.fromFile("Nantes")
 pop = []
 for i in range(100):
     pop.append(generateLines(city.stations,3,2,20,180))
