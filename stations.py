@@ -171,7 +171,7 @@ class City:
                 ly.append(station.y)
             plt.plot(lx,ly,label = line.id)
         plt.scatter(xs,ys)
-        plt.legend()
+        #plt.legend()
         #plt.show()
     def Dijkstra(self,xstart,ystart,xend,yend,tstart,tstartSim):
         tabDijkstra = []
@@ -203,9 +203,9 @@ class City:
                             tabLine[j] = line.id
             for i in range(len(tabDijkstra)-1):
                 if i not in previousMins:
-                    distWalk = ts + self.stations[minIndex].distanceStat(self.stations[i])
-                    if distEnd < tabDijkstra[i]:
-                        tabDijkstra[i] = distEnd
+                    distWalk = ts + self.stations[minIndex].distanceStat(self.stations[i])*720
+                    if distWalk < tabDijkstra[i]:
+                        tabDijkstra[i] = distWalk
             distEnd = self.stations[minIndex].distance(xend,yend)*720 + ts
             if distEnd < tabDijkstra[-1]:
                 tabDijkstra[-1] = distEnd
@@ -342,7 +342,7 @@ def getParetos(listA,listB):
     for i in range(len(listA)):
         pareto = True
         for j in range(len(listA)):
-            if (listA[j] > listA[i]) and (listB[j] > listB[i]):
+            if (listA[j] < listA[i]) and (listB[j] < listB[i]):
                 pareto = False
         if pareto :
             paretos.append(i)
@@ -483,15 +483,85 @@ city2 = City.fromFile("Paris")
 city2.setName("Milan")
 city2.save() """
 
-city = generateCity(20,0,10,0,10,3,0,5,180,"{name}")
-city.save()
+""" city = generateCity(20,0,10,0,10,3,0,5,180,"Valence")
+city.save() """
 
-city = City.fromFile("{name}")
+""" city = City.fromFile("Valence")
 pop = []
 for i in range(100):
     pop.append(generateLines(city.stations,3,2,20,180))
-saveResEvoTwo(evolutionProcess2(city,pop,100,5,10,None))
 
+bests,allres,alllen,paretos,parres,parlens = evolutionProcess2(city,pop,10,5,10,None)
+saveResEvoTwo(bests,allres,alllen,paretos,parres,parlens,"Valence")
+ """
 
 #save the parameters for nancy
 #TODO : make a big list of all paretos, after each step, check if they are still paretos
+
+def plotResE1(name):
+    with open(f"./cities/{name}_best_allres.json", "r") as city_file:
+        allres = json.load(city_file)
+    gens = []
+    best = []
+    avg = []
+    median = []
+    for i in range(len(allres)):
+        gens.append(i+1)
+        best.append(allres[i][0])
+        avg.append(allres[i][1])
+        median.append(allres[i][2])
+    plt.plot(gens,best,label = "Best")
+    plt.plot(gens,avg, label = "Average")
+    plt.plot(gens,median, label = "Median")
+    plt.title("Evolution of average travel time in function of the generation")
+    plt.xlabel("Generation")
+    plt.ylabel("Average travel time")
+    plt.legend()
+    plt.show()
+
+def plotparE2(name):
+    with open(f"./cities/{name}_best_parlen.json", "r") as city_file:
+        parlen = json.load(city_file)
+    with open(f"./cities/{name}_best_parres.json", "r") as city_file:
+        parres = json.load(city_file)
+    plt.scatter(parlen,parres)
+    plt.title("Example of pareto front obtained")
+    plt.xlabel("Length of the lines")
+    plt.ylabel("Average travel time")
+    plt.show()
+
+def plotcitE2(name,index):
+    with open(f"./cities/{name}_stations.json", "r") as city_file:
+        stations = json.load(city_file)
+    with open(f"./cities/par_{name}_best_paretos.json", "r") as city_file:
+        pareto = json.load(city_file)
+    print(len(pareto))
+    c = City.fromJson(stations,pareto[index],"arbre")
+    c.plot()
+    plt.title("Example of city obtained")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.legend()
+    plt.show()
+
+""" plotparE2("Nantes")
+plotcitE2("Nantes",16) """
+""" city = City.fromFile("Nantes")
+fixedTests = []
+for i in city.stations:
+    for j in city.stations:
+        if i != j:
+            fixedTests.append([i.x,i.y,j.x,j.y])
+print(len(fixedTests))
+print(getLenTunnels(city.lines))
+print(city.testFixed(fixedTests,10000,10030))
+city.plot()
+plt.title("Example of a city")
+plt.show() """
+c = City.fromFile("Valence")
+c.setLines([])
+c.plot()
+plt.title("Example of a city")
+plt.show()
+plotparE2("Valence")
+plotcitE2("Valence",6)
