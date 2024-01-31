@@ -341,6 +341,7 @@ def getParetos(listA,listB):
                 pareto = False
         if pareto :
             paretos.append(i)
+    return paretos
 
 def evolutionStep(city : City,listLines : list[list[Line]],size,nbTests=None,nbArg = 1):
     results = []
@@ -363,7 +364,7 @@ def evolutionStep(city : City,listLines : list[list[Line]],size,nbTests=None,nbA
         sortListLines = listLines.copy()
         sortListLines.sort(key = lambda j : results[listLines.index(j)])
         results.sort()
-        return sortListLines[:size],results[:size]
+        return sortListLines[:size],results
     if nbArg == 2 :
         lenTunnels = []
         for i in range(len(listLines)) :
@@ -373,30 +374,52 @@ def evolutionStep(city : City,listLines : list[list[Line]],size,nbTests=None,nbA
         paretosLines = []
         paretosRes = []
         paretosLens = []
-        for i in range(min(len(paretosIndexs,size))):
+        for i in range(min(len(paretosIndexs),size)):
             ind = paretosIndexs[i]
             paretosLines.append(listLines[ind])
             paretosRes.append(results[ind])
             paretosLens.append(lenTunnels[ind])
         return paretosLines,paretosRes,paretosLens
 
-def evolutionProcess(city,pop,nbGenerations,nbMutations,nbKeep,nbTests=None):
+def evolutionProcess(city,pop,nbGenerations,nbMutations,nbKeep,nbTests=None,nbArg=1):
     allResults = []
+    if nbArg == 2:
+        allLens = []
     for i in range(nbGenerations):
-        bests,results = evolutionStep(city,pop,nbKeep,nbTests)
-        print("Gen ",i," done")
-        print("Best averages : ",results)
-        allResults.append([results[0],sum(results)/len(results),results[floor(len(results)/2)]])
+        if nbArg == 1 :
+            bests,results = evolutionStep(city,pop,nbKeep,nbTests,nbArg)
+            print("Gen ",i," done")
+            print("Best averages : ",results)
+            allResults.append([results[0],sum(results)/len(results),results[floor(len(results)/2)]])
+        if nbArg == 2 :
+            bests,results,lens = evolutionStep(city,pop,nbKeep,nbTests,nbArg)
+            print("Gen ",i," done")
+            print("Pareto averages : ",results)
+            print("Pareto lens :",lens)
+            allResults.append(results)
+            allLens.append(lens)
         newPop = []
         tot = 0
-        """ while tot < len(pop):
-            newPop.append(mutateLines(bests(tot%len(bests)),city.stations,nbMutations))
-            tot+=1 """
-        for lines in bests :
-            for j in range(int(len(pop)/len(bests))):
-                newPop.append(mutateLines(lines,city.stations,nbMutations))
+        while tot < len(pop):
+            newPop.append(mutateLines(bests[tot%len(bests)],city.stations,nbMutations))
+            tot+=1
         pop = newPop
-    return City(city.stations,evolutionStep(city,pop,nbKeep,nbTests)[0][0],city.name+"_best"),allResults
+    if nbArg == 1:
+        return City(city.stations,bests[0],city.name+"_best"),allResults
+    if nbArg == 2:
+        return bests,allResults,allLens
+
+def saveListLines(listLines : list[list[Line]],name):
+    saveable = []
+    for i in listLines:
+        saveableLines = []
+        for line in i :
+            saveableLines.append(line.toJson())
+        saveable.append(saveableLines)
+    with open(f"./cities/{name}_paretos.json", "w") as city_file:
+            json.dump(saveable, city_file, indent=4)
+    
+    
 """ stations = [Station(0,0,0),Station(2,1,1),Station(1,0,2)]
 lines = [Line(stations,180)]
 city = City(stations,lines,"Paris")
@@ -412,9 +435,11 @@ city = City.fromFile("Nantes")
 pop = []
 for i in range(100):
     pop.append(generateLines(city.stations,3,2,20,180))
-best_city, allres = evolutionProcess(city,pop,100,5,10)
-best_city.save()
-with open(f"./cities/{best_city.name}_allres.json", "w") as city_file:
+bests, allres,alllen = evolutionProcess(city,pop,100,5,10,None,2)
+saveListLines(bests,"Nantes_best")
+with open(f"./cities/Nantes_best_allres.json", "w") as city_file:
     json.dump(allres, city_file, indent=4)
+with open(f"./cities/Nantes_best_alllen.json", "w") as city_file:
+    json.dump(alllen, city_file, indent=4)
 
 #save the parameters for nancy
